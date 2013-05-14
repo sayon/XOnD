@@ -1,0 +1,289 @@
+<html>  <head>    <title>TTT XOnD</title>    <style>canvas { width: 100%; height: 100% }</style>  </head><body><script src="lib/three.min.js"></script><script src="lib/OrbitControls.js"></script><script src="lib/coffee-script.js"></script><script type="text/coffeescript">
+#blue vs green
+
+#constants and globals
+ 
+myDistance = 1300  
+myCamera = 0
+myScene = 0
+myRenderer = 0 
+myControls = 0 
+
+playerColor = [
+	0x00FF00
+	0x0000FF
+	]
+playerNames = [
+	"green",
+	"blue"]
+selectedCubeMaterials = [ 
+	new THREE.MeshLambertMaterial( {transparent: true, opacity: 0.8, ambient: playerColor[0], color: playerColor[0], diffuse: 0} ),
+	new THREE.MeshLambertMaterial( {transparent: true, opacity: 0.8, ambient: playerColor[1], color: playerColor[1], diffuse: 0} )
+	]
+winCubeMaterial = new THREE.MeshLambertMaterial( {transparent: true, opacity: 0.8, ambient: 0xeedd00, color: 0xeedd00, diffuse: 0} ) 
+
+playersTotal = 2
+	 
+#those are the glorious cubes we are seeing on the screen 
+myCubes = []	
+
+#all visible objects are here to help ray casting on them 
+mySceneObjects = []
+
+#all cubes in an unselected state. We store them so that we could go back to them fast
+myStartCubes = [] 
+ 
+
+#playing on a field of a size 3. In future, this can be changed
+myFieldSize = 3
+
+#how sparse are cubes in space
+mySparsity = 400
+ 
+	
+myTurnCounter = 0
+myGameInProgress = true
+ 
+dirs4p =[[[0,0,0,1],[0,0,0,-1]],[[0,0,0,-1],[0,0,0,1]],[[0,0,1,0],[0,0,-1,0]],[[0,0,1,1],[0,0,-1,-1]],[[0,0,1,-1],[0,0,-1,1]],[[0,0,-1,0],[0,0,1,0]],[[0,0,-1,1],[0,0,1,-1]],[[0,0,-1,-1],[0,0,1,1]],[[0,1,0,0],[0,-1,0,0]],[[0,1,0,1],[0,-1,0,-1]],[[0,1,0,-1],[0,-1,0,1]],[[0,1,1,0],[0,-1,-1,0]],[[0,1,1,1],[0,-1,-1,-1]],[[0,1,1,-1],[0,-1,-1,1]],[[0,1,-1,0],[0,-1,1,0]],[[0,
+1,-1,1],[0,-1,1,-1]],[[0,1,-1,-1],[0,-1,1,1]],[[0,-1,0,0],[0,1,0,0]],[[0,-1,0,1],[0,1,0,-1]],[[0,-1,0,-1],[0,1,0,1]],[[0,-1,1,0],[0,1,-1,0]],[[0,-1,1,1],[0,1,-1,-1]],[[0,-1,1,-1],[0,1,-1,1]],[[0,-1,-1,0],[0,1,1,0]],[[0,-1,-1,1],[0,1,1,-1]],[[0,-1,-1,-1],[0,1,1,1]],[[1,0,0,0],[-1,0,0,0]],[[1,0,0,1],[-1,0,0,-1]],[[1,0,0,-1],[-1,0,0,1]],[[1,0,1,0],[-1,0,-1,0]],[[1,0,1,1],[-1,0,-1,-1]]
+,[[1,0,1,-1],[-1,0,-1,1]],[[1,0,-1,0],[-1,0,1,0]],[[1,0,-1,1],[-1,0,1,-1]],[[1,0,-1,-1],[-1,0,1,1]],[[1,1,0,0],[-1,-1,0,0]],[[1,1,0,1],[-1,-1,0,-1]],[[1,1,0,-1],[-1,-1,0,1]],[[1,1,1,0],[-1,-1,-1,0]],[[1,1,1,1],[-1,-1,-1,-1]],[[1,1,1,-1],[-1,-1,-1,1]],[[1,1,-1,0],[-1,-1,1,0]],[[1,1,-1,1],[-1,-1,1,-1]],[[1,1,-1,-1],[-1,-1,1,1]],[[1,-1,0,0],[-1,1,0,0]],[[1,-1,0,1],[-1,1,0,-1]],[[1,-1,
+0,-1],[-1,1,0,1]],[[1,-1,1,0],[-1,1,-1,0]],[[1,-1,1,1],[-1,1,-1,-1]],[[1,-1,1,-1],[-1,1,-1,1]],[[1,-1,-1,0],[-1,1,1,0]],[[1,-1,-1,1],[-1,1,1,-1]],[[1,-1,-1,-1],[-1,1,1,1]],[[-1,0,0,0],[1,0,0,0]],[[-1,0,0,1],[1,0,0,-1]],[[-1,0,0,-1],[1,0,0,1]],[[-1,0,1,0],[1,0,-1,0]],[[-1,0,1,1],[1,0,-1,-1]],[[-1,0,1,-1],[1,0,-1,1]],[[-1,0,-1,0],[1,0,1,0]],[[-1,0,-1,1],[1,0,1,-1]],[[-1,0,-1,-1],[1,0
+,1,1]],[[-1,1,0,0],[1,-1,0,0]],[[-1,1,0,1],[1,-1,0,-1]],[[-1,1,0,-1],[1,-1,0,1]],[[-1,1,1,0],[1,-1,-1,0]],[[-1,1,1,1],[1,-1,-1,-1]],[[-1,1,1,-1],[1,-1,-1,1]],[[-1,1,-1,0],[1,-1,1,0]],[[-1,1,-1,1],[1,-1,1,-1]],[[-1,1,-1,-1],[1,-1,1,1]],[[-1,-1,0,0],[1,1,0,0]],[[-1,-1,0,1],[1,1,0,-1]],[[-1,-1,0,-1],[1,1,0,1]],[[-1,-1,1,0],[1,1,-1,0]],[[-1,-1,1,1],[1,1,-1,-1]],[[-1,-1,1,-1],[1,1,-1,1]
+],[[-1,-1,-1,0],[1,1,1,0]],[[-1,-1,-1,1],[1,1,1,-1]],[[-1,-1,-1,-1],[1,1,1,1]]]                                                                                                                                                            
+
+dirs3p = [[[0,0,1],[0,0,-1]],[[0,0,-1],[0,0,1]],[[0,1,0],[0,-1,0]],[[0,1,1],[0,-1,-1]],[[0,1,-1],[0,-1,1]],[[0,-1,0],[0,1,0]],[[0,-1,1],[0,1,-1]],[[0,-1,-1],[0,1,1]],[[1,0,0],[-1,0,0]
+],[[1,0,1],[-1,0,-1]],[[1,0,-1],[-1,0,1]],[[1,1,0],[-1,-1,0]],[[1,1,1],[-1,-1,-1]],[[1,1,-1],[-1,-1,1]],[[1,-1,0],[-1,1,0]],[[1,-1,1],[-1,1,-1]],[[1,-1,-1],[-1,1,1]],[[-1,0,0],[1,0,0]],[[-1,0,
+1],[1,0,-1]],[[-1,0,-1],[1,0,1]],[[-1,1,0],[1,-1,0]],[[-1,1,1],[1,-1,-1]],[[-1,1,-1],[1,-1,1]],[[-1,-1,0],[1,1,0]],[[-1,-1,1],[1,1,-1]],[[-1,-1,-1],[1,1,1]]]                                   
+checkWins3 = (field, x,y,z,dim ) ->
+	playerc = field[x][y][z]
+	if playerc == -1 
+		return null
+	for dirpair in dirs3p
+		counter = -1
+		startpos = [x,y,z]
+		winpositions = []
+		for dir in dirpair
+			pos = startpos
+			while field[pos[0]][pos[1]][pos[2]] == playerc && counter < 3
+				winpositions.push pos
+				counter += 1
+				pos = vadd( pos,dir )			
+				if ! pos.every( (x) -> 0 <= x <= 2 )
+					break
+		if counter >= 3
+			return winpositions
+	return null
+
+checkWins4 = (field, k, x, y, z,dim ) ->
+	 
+	playerc = field[k][x][y][z] 
+	if playerc == -1 
+		return null
+	for dirpair in dirs4p
+		counter = -1
+		startpos = [k,x,y,z] 
+		winpositions = []
+		for dir in dirpair
+			pos = startpos
+			while field[pos[0]][pos[1]][pos[2]][pos[3]] == playerc && counter < 3
+				winpositions.push pos
+				counter += 1
+				pos = vadd( pos,dir )			
+				if ! pos.every( (x) -> 0 <= x <= 2 )
+					break
+		if counter >= 3
+			return winpositions
+	return null				 
+
+isPlayersTurn = (player_id) -> currentPlayer() == player_id
+currentPlayer = () -> myTurnCounter % playersTotal
+
+myBattlefield = 0
+
+initializeBattlefield = (dim) -> 
+	initializeArrayRecursive( [], dim, 4, -1) 
+	
+window.initializeArrayRecursive = (array, dim, counter, value) ->
+	if (counter == 0) 
+		return value
+	array = new Array(dim)
+	for i in [0.. (dim-1)]
+		array[i] = initializeArrayRecursive( array, dim, counter-1, value)
+		
+isFree = ([k,x,y,z]) -> myBattlefield[k][x][y][z] == -1
+occupy = ([k,x,y,z]) -> myBattlefield[k][x][y][z] = currentPlayer()
+
+	
+turn = ([k,x,y,z]) ->   
+	if (isFree([k,x,y,z]))  
+		occupy([k,x,y,z]) 
+		markCube( currentPlayer(), k,x,y,z) 
+		winpath = checkWins4(myBattlefield, k, x,y,z, myFieldSize) 
+		if (winpath != null) 
+			myGameInProgress = false
+		return winpath
+	else
+		return null
+	
+
+nextTurn = () ->
+	myTurnCounter += 1
+ 
+createCube = (dim, x,y,z, pcolor= 0xff0000) ->
+	geometry =  new THREE.CubeGeometry( dim, dim, dim ) 
+	cube = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( {wireframe: true, transparent: true, opacity: 0.8, ambient: pcolor, color: pcolor, diffuse: 0} ) )
+	cube.position = { x , y , z }  
+	mySceneObjects.push cube 
+	return cube
+	
+
+vadd = (s1, s2) ->
+	out = []
+	for i in [0.. (s1.length-1)]
+			out[i] = s1[i] + s2[i]
+	return out
+
+vsub = (s1, s2) ->
+	out = []
+	for i in [0.. (s1.length-1)]
+			out[i] = s1[i] - s2[i]
+	return out
+	
+smul = (s1,con) ->
+	return s1.map( (x) -> x*con )
+		
+ 
+markCube = (player_id, k,x,y,z) ->
+	myCubes[k][x][y][z].material = selectedCubeMaterials[player_id]
+clearCube = (k,x,y,z) ->
+	myCubes[k][x][y][z].material = myStartCubes[x][y][z].material
+ 	 
+initCubes = (scene, startOffset) ->
+	color = 0xff0000
+	cubes = []
+	ranges = [-mySparsity + startOffset, startOffset, mySparsity+ startOffset]
+	for x in ranges
+		slice = []
+		for y in ranges
+			col = []
+			for z in ranges
+				cube = createCube( 100, x,	y, z, color )  
+				scene.add cube
+				col.push cube 
+			slice.push col
+		color += 0x005500
+		cubes.push slice  
+	return cubes
+		 
+initScene = () ->
+	scene = new THREE.Scene() 
+	scene.add( new THREE.AmbientLight(0xeeeeee))
+
+	scene.fog = new THREE.FogExp2( 0x3333ee, 0.00005 ); 
+	i = 0
+	for soffset in [-1000,0,1000]
+		myStartCubes[i] = initCubes(scene, soffset)
+		i+=1
+	i = 0
+	
+	for soffset in [-1000,0,1000]
+		myCubes[i] = initCubes(scene, soffset)
+		i+=1
+	return scene 
+
+
+
+setupCamera = () ->
+	camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 10000 )
+	camera.position.z = myDistance
+	return camera 
+	
+setupRenderer = () -> 
+	renderer = new THREE.WebGLRenderer()
+	renderer.setSize( window.innerWidth, window.innerHeight )
+	document.body.appendChild( renderer.domElement )
+	renderer.setClearColor(0xdddddd,1)	
+	return renderer
+	
+setupControls = (cam) ->
+	controls = new THREE.OrbitControls( cam );
+	controls.addEventListener( 'change', render );
+	return controls
+	
+
+initGame = () -> 
+	myBattlefield = initializeBattlefield(myFieldSize)  
+	
+ 
+	
+render = () -> 
+	myRenderer.render( myScene, myCamera )
+init = () -> 
+	myCamera = setupCamera() 
+	myScene = initScene() 
+	myRenderer = setupRenderer()
+	myControls = setupControls(myCamera)
+		
+animate = () -> 
+	requestAnimationFrame( animate ) 
+	render()
+	myControls.update() 
+window.onload = -> start()
+
+start = () -> 
+	init()
+	initGame() 
+	animate() 
+
+gameTurn = (idx) -> 
+	if (myGameInProgress)
+		winpath = turn( idx )
+		if winpath!= null
+			myGameInProgress = false
+			alert "Player #{playerNames[currentPlayer()]} won!" 
+		nextTurn()
+		return winpath
+	else 
+		return null	
+		
+		
+		
+document.ondblclick  = (event) ->	 
+	vector = new THREE.Vector3((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1, 0.5)
+	projector = new THREE.Projector()
+	projector.unprojectVector(vector, myCamera)
+
+	raycaster = new THREE.Raycaster(myCamera.position, vector.sub(myCamera.position).normalize())
+	intersects = raycaster.intersectObjects(mySceneObjects)
+			
+	getCubeIndex = (intersections, arr ) ->  
+		for k in [0.. 2]
+			for x in [0.. 2 ] 
+				for y in [0..2 ] 
+					for z in [0..2 ]  
+						for o in intersections   
+							if  arr[k][x][y][z].id  == o.object.id
+								return [k,x,y,z] 
+		return null   	
+		
+		
+	if (intersects.length > 0)  
+		idx = getCubeIndex( intersects, myCubes )   
+		winpath = gameTurn(idx)
+		#console.debug winpath
+		if (winpath != null)
+			for e in winpath  
+					myCubes[e[0]][e[1]][e[2]][e[3]].material = winCubeMaterial 
+					
+		
+
+window.onresize = () ->
+	myCamera.aspect = window.innerWidth / window.innerHeight
+	myCamera.updateProjectionMatrix()
+	myRenderer.setSize( window.innerWidth, window.innerHeight )
+	
+	
+</script>
+	
+</body>
+</html>
